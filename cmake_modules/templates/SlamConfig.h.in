@@ -1,0 +1,27 @@
+#ifndef SLAM_CONFIG_H
+#define SLAM_CONFIG_H
+
+#cmakedefine BUILD_SHARED_LIBS
+
+/* Use GPU to accelerate computing. */
+#cmakedefine SLAM_ENABLE_CUDA
+
+/* Use feature points in tracking and mapping. */
+#cmakedefine SLAM_ENABLE_POINT
+
+/* Complete all work in one thread */
+#cmakedefine SLAM_SINGLE_THREAD
+
+/* Build with OpenCV */
+#cmakedefine SLAM_HAVE_OPENCV
+
+/* Build with Eigen. */
+#cmakedefine SLAM_HAVE_EIGEN
+
+/* Build with Boost. */
+#cmakedefine SLAM_HAVE_BOOST
+
+/* Build with yaml-cpp. */
+#cmakedefine SLAM_HAVE_YAML
+
+#endif

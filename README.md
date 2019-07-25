@@ -6,7 +6,7 @@
 
 ## Classes
 
-|               All classes              |
+|            |  All classes |            |
 | :--------: | :----------: | :--------: |
 | Exception  |  YamlReader  |  Configure |
 
@@ -25,6 +25,7 @@ It should be noted that *cv::FileStorage* could't recognize *true* and *false* a
 
 In particular, it provides '*Read*' and '*ReadSafe*' method.
 '*Read*' accepts a *name* which means the key name and return the value corresponding to *name*.
+The *name* of full node path separated by colons is also allowed. 
 The value also can be returned by referencing parameters.
 Compared to '*Read*', '*ReadSafe*' accept additional a default value that will be set if fail to read.
 
@@ -47,7 +48,7 @@ It requires *OpenCV* or *Yaml-cpp* to read files.
 
 ## Trouble
 
-If the classes don't work as well as your wishes,
+If the classes don't work as well as your wishes, you can
 
 * check the previous issues
 * add a new issues.

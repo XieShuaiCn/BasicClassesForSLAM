@@ -640,11 +640,12 @@ namespace SLAM
         template<typename T>
         inline bool YamlReader::ReadNode(const YAML::Node &node, T &val)
         {
-            if(node.IsDefined() && !node.IsNull())
-            {
-                val = node.as<T>();
-                return true;
-            }
+            try {
+                if (node.IsDefined() && !node.IsNull()) {
+                    val = node.as<T>();
+                    return true;
+                }
+            }catch (...){ }
             return false;
         }
 
@@ -657,16 +658,15 @@ namespace SLAM
         template<typename T>
         inline bool YamlReader::ReadNodeSafe(const YAML::Node &node, T &val, const T &default_value)
         {
-            if(node.IsDefined() && !node.IsNull())
-            {
-                val = node.as<T>();
-                return true;
-            }
-            else
-            {
-                val = default_value;
-                return false;
-            }
+            try {
+                if(node.IsDefined() && !node.IsNull())
+                {
+                    val = node.as<T>();
+                    return true;
+                }
+            }catch (...){ }
+            val = default_value;
+            return false;
         }
 #else
         inline const cv::FileNode YamlReader::GetNode(int i) const
@@ -731,8 +731,7 @@ namespace SLAM
             T val_old = val;
             if(!node.empty() && !node.isNone())
             {
-                cv::readFileNode(node, val, T());
-                return true;
+                return cv::readFileNode(node, val, T());
             }
             val = val_old;
             return false;

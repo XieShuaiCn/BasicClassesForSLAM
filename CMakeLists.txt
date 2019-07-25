@@ -93,9 +93,16 @@ if (SLAM_HAVE_YAML)
     target_link_libraries(${SLAM_LIBRARY_NAME} ${YAML_CPP_LIBRARIES})
 endif()
 
-if(Boost_FOUND OR BOOST_FOUND OR Boost_INCLUDE_DIRS)
-    set(SLAM_HAVE_BOOST ON)
-endif()
+if (BUILD_TEST)
+    add_subdirectory(test bin)
+
+    enable_testing()
+    add_test(NAME Test_SlamYaml_int COMMAND ReadYaml ${CMAKE_SOURCE_DIR}/test/data.yaml i num)
+    set_tests_properties(Test_SlamYaml_int PROPERTIES PASS_REGULAR_EXPRESSION 1000 FAIL_REGULAR_EXPRESSION "FAIL")
+    add_test(NAME Test_SlamYaml_float COMMAND ReadYaml ${CMAKE_SOURCE_DIR}/test/data.yaml f fx)
+    set_tests_properties(Test_SlamYaml_float PROPERTIES PASS_REGULAR_EXPRESSION 356.45 FAIL_REGULAR_EXPRESSION "FAIL")
+endif(BUILD_TEST)
+
 include(cmake_modules/SlamConfig.cmake)
 
 status("")

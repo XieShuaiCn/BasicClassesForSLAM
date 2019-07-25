@@ -1,7 +1,9 @@
 
 # build folder
+bin/
 build/
 lib/
+Testing
 
 # CLion cache
 .idea/*

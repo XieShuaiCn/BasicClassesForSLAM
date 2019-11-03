@@ -119,7 +119,7 @@ namespace SLAM
             }
             size_t it1 = name.find(':', 0);
             if (it1 == std::string::npos) {
-                return node[name];
+                return node.IsMap() ? node[name] : YAML::Node();
             }
             std::string n = name.substr(0, it1);
             return GetNode(node[n], name.substr(it1 + 1));
@@ -130,7 +130,7 @@ namespace SLAM
             size_t it0 = 0;
             size_t it1 = name.find(':');
             YAML::Node node = m_root;
-            while(it1 < std::string::npos && node.IsDefined()){
+            while(it1 < std::string::npos && node.IsDefined() && node.IsMap()){
                 if(it0 < it1) {
                     std::string n = name.substr(it0, it1 - it0);
                     node = node[n];
@@ -138,7 +138,7 @@ namespace SLAM
                 it0 = it1+1;
                 it1 = name.find(':', it0);
             }
-            if(it0 < name.size() && node.IsDefined())
+            if(it0 < name.size() && node.IsDefined() && node.IsMap())
                 return node[name.substr(it0)];
             else
                 return YAML::Node();

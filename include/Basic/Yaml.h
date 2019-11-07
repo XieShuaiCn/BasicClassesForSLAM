@@ -138,7 +138,7 @@ namespace SLAM
         class YamlWriter
         {
         public:
-            YamlWriter() = default;
+            YamlWriter();
 
             explicit YamlWriter(const std::string &file);
 
@@ -167,14 +167,21 @@ namespace SLAM
 #endif
         };
 
-        class YamlIO : public YamlReader, public YamlWriter
+        class YamlIO : public YamlReader
         {
         public:
             YamlIO() = default;
 
             explicit YamlIO(const std::string &file);
 
-            explicit YamlIO(std::iostream &stream);
+            ~YamlIO();
+
+            std::string GetString();
+
+            template<typename T>
+            void Write(const std::string &name, const T &value);
+        private:
+            std::string m_strFile;
         };
     }
 }
@@ -182,53 +189,9 @@ namespace SLAM
 #ifdef SLAM_HAVE_YAML
 namespace YAML
 {
-    /***********Have implemented by yaml-cpp*********************
-    // Specific template of std::vector converter........Have implemented by yaml-cpp
-    template<typename _Tp>
-    struct convert<std::vector<_Tp>>
-    {
-        static Node encode(const std::vector<_Tp> &vec);
-
-        static bool decode(const Node &node, std::vector<_Tp> &vec);
-    };
-    // output std::vector to YAML::Emitter,,,,,,,Have implemented by yaml-cpp
-    template <typename _Tp>
-    Emitter &operator<<(Emitter &out, const std::vector<_Tp> &vec);
-    */
-
     // output std::initializer_list to YAML::Emitter
     template<typename _T>
     Emitter &operator<<(Emitter &out, const std::initializer_list<_T> &lst);
-
-#ifdef SLAM_HAVE_OPENCV
-    // Specific template of cv::Mat converter
-    template<>
-    struct convert<cv::Mat>
-    {
-        static Node encode(const cv::Mat &m);
-
-        static bool decode(const Node &node, cv::Mat &mat);
-    };
-
-    // output cv::Mat to YAML::Emitter
-    Emitter &operator<<(Emitter &out, const cv::Mat &mat);
-#endif
-#ifdef SLAM_HAVE_EIGEN
-    // Specific template of Eigen::Matrix template
-    template<typename _T, int _R, int _C>
-    struct convert<Eigen::Matrix<_T, _R, _C>>
-    {
-        static Node encode(const Eigen::Matrix<_T, _R, _C> &m);
-
-        static bool decode(const Node &node, Eigen::Matrix<_T, _R, _C> &m);
-    };
-
-    // output Eigen::Matrix to YAML::Emitter
-    template<typename _T, int _R, int _C>
-    Emitter &operator<<(Emitter &out, const Eigen::Matrix<_T, _R, _C> &mat);
-
-    extern template struct convert<Eigen::Matrix<double, 3, 1>>;
-#endif
 }
 #else //SLAM_HAVE_OPENCV
 namespace cv{
@@ -237,29 +200,65 @@ namespace cv{
     bool readFileNode_ulong(const FileNode& node, unsigned long& value, unsigned long default_value);
 
     template <typename _Tp>
-    inline bool readFileNode(const FileNode &node, _Tp &value, _Tp default_value)
-    {
-        if(node.empty() || node.isNone())
-            return false;
-        cv::read(node, value, default_value);
-        return true;
-    }
+    struct NodeConverter{
+        static bool read(const FileNode &node, _Tp &value, const _Tp &default_value){
+            if(node.empty() || node.isNone())
+                return false;
+            cv::read(node, value, default_value);
+            return true;
+        }
+        static bool write(FileStorage &file, const String& name, const _Tp &value) {
+            cv::write(file, name, value);
+            return true;
+        }
+    };
 
     template <>
-    inline bool readFileNode<bool>(const FileNode &node, bool &value, bool default_value)
-    {
-        return readFileNode_bool(node, value, default_value);
-    }
+    struct NodeConverter<bool>{
+        static bool read(const FileNode &node, bool &value, const bool &default_value){
+            return readFileNode_bool(node, value, default_value);
+        }
+        static bool write(FileStorage &file, const String& name, const bool &value) {
+            cv::write(file, name, (value ? "true" : "false"));
+            return true;
+        }
+    };
+
     template <>
-    inline bool readFileNode<long>(const FileNode& node, long& value, long default_value)
-    {
-        return readFileNode_long(node, value, default_value);
-    }
+    struct NodeConverter<unsigned int>{
+        static bool read(const FileNode &node, unsigned int &value, const unsigned int &default_value){
+            unsigned long val = 0;
+            bool ret = readFileNode_ulong(node, val, static_cast<unsigned long>(default_value));
+            value = static_cast<unsigned int>(val);
+            return ret;
+        }
+        static bool write(FileStorage &file, const String& name, const unsigned int &value) {
+            cv::write(file, name, std::to_string(value));
+            return true;
+        }
+    };
+
     template <>
-    inline bool readFileNode<unsigned long>(const FileNode& node, unsigned long& value, unsigned long default_value)
-    {
-        return readFileNode_ulong(node, value, default_value);
-    }
+    struct NodeConverter<long>{
+        static bool read(const FileNode &node, long &value, const long &default_value){
+            return readFileNode_long(node, value, default_value);
+        }
+        static bool write(FileStorage &file, const String& name, const long &value) {
+            cv::write(file, name, std::to_string(value));
+            return true;
+        }
+    };
+
+    template <>
+    struct NodeConverter<unsigned long>{
+        static bool read(const FileNode &node, unsigned long &value, const unsigned long &default_value){
+            return readFileNode_ulong(node, value, default_value);
+        }
+        static bool write(FileStorage &file, const String& name, const unsigned long &value) {
+            cv::write(file, name, std::to_string(value));
+            return true;
+        }
+    };
 }
 #endif // SLAM_HAVE_YAML
 //////////////////////////////// implements ////////////////////////////////
@@ -443,74 +442,6 @@ namespace SLAM
 #ifdef SLAM_HAVE_YAML
 namespace YAML
 {
-#ifdef SLAM_HAVE_OPENCV
-    // output cv::Mat to YAML::Emitter
-    inline Emitter &operator<<(Emitter &out, const cv::Mat &mat)
-    {
-        out << convert<cv::Mat>::encode(mat);
-        return out;
-    }
-#endif
-#ifdef SLAM_HAVE_EIGEN
-    // Specific template of Eigen::Matrix template
-    template<typename _T, int _R, int _C>
-    Node convert<Eigen::Matrix<_T, _R, _C>>::encode(const Eigen::Matrix<_T, _R, _C> &m)
-    {
-        Node node, node_data;
-        node["rows"] = Node(m.rows());
-        node["cols"] = Node(m.cols());
-        node["dt"] = char(
-                SLAM::Basic::TypeFromStd<typename Eigen::internal::traits<Eigen::Matrix<_T, _R, _C>>::Scalar>::Name);
-        for (int i = 0; i < _R * _C; ++i)
-        {
-            node_data.push_back(m(i));
-        }
-        node["data"] = node_data;
-        return node;
-    }
-
-    template<typename _T, int _R, int _C>
-    bool convert<Eigen::Matrix<_T, _R, _C>>::decode(const Node &node, Eigen::Matrix<_T, _R, _C> &m)
-    {
-        if (node.IsMap())
-        {
-            // size
-            int rows = SLAM::Basic::YamlReader::ReadNamedNodeSafe<int>(node, "rows", _R);
-            int cols = SLAM::Basic::YamlReader::ReadNamedNodeSafe<int>(node, "cols", _C);
-            if (rows != _R || cols != _C)
-                return false;
-            // type
-            std::string dt = SLAM::Basic::YamlReader::ReadNamedNodeSafe<std::string>(node, "dt", "d");
-            if (dt.size() != 1 || dt[0] != SLAM::Basic::TypeFromStd<_T>::Name)
-                return false;
-            auto node_data = node["data"];
-            for (int i = 0; i < _R * _C; ++i)
-            {
-                m(i) = node_data[i].as<double>();
-            }
-            return true;
-        }
-        else if(node.IsSequence())
-        {
-            if(node.size() != _R *_C)
-                return false;
-            for (int i = 0; i < _R * _C; ++i)
-            {
-                m(i) = node[i].as<_T>();
-            }
-            return true;
-        }
-        return false;
-    }
-
-    // output Eigen::Matrix to YAML::Emitter
-    template<typename _T, int _R, int _C>
-    inline Emitter &operator<<(Emitter &out, const Eigen::Matrix<_T, _R, _C> &mat)
-    {
-        out << convert<Eigen::Matrix<_T, _R, _C>>::encode(mat);
-        return out;
-    }
-#endif
     // output std::initializer_list to YAML::Emitter
     template<typename _T>
     inline Emitter &operator<<(Emitter &out, const std::initializer_list<_T> &lst)
@@ -590,7 +521,7 @@ namespace SLAM
         inline T YamlReader::ReadNamedNode(const YAML::Node &node, const std::string &name)
         {
             YAML::Node parameter = (name.empty() ? node : GetNode(node, name));
-            if(!node.IsDefined() || node.IsNull())
+            if(!parameter.IsDefined() || parameter.IsNull())
             {
 #ifdef YAML_RAISE_EXCEPTION_IF_RETURN_NULL_NODE
                 throw Exception(Exception::ERROR_YAML, "Yaml node has not this key.");
@@ -598,7 +529,7 @@ namespace SLAM
                 return T();
 #endif
             }
-            return node.as<T>();
+            return parameter.as<T>();
         }
 
         template<typename T>
@@ -731,7 +662,7 @@ namespace SLAM
             T val_old = val;
             if(!node.empty() && !node.isNone())
             {
-                return cv::readFileNode(node, val, T());
+                return cv::NodeConverter<T>::read(node, val, T());
             }
             val = val_old;
             return false;
@@ -741,14 +672,14 @@ namespace SLAM
         inline T YamlReader::ReadNodeSafe(const cv::FileNode &node, const T &default_value)
         {
             T value;
-            cv::readFileNode(node, value, default_value);
+            cv::NodeConverter<T>::read(node, value, default_value);
             return value;
         }
 
         template<typename T>
         inline bool YamlReader::ReadNodeSafe(const cv::FileNode &node, T &val, const T &default_value)
         {
-            return cv::readFileNode(node, val, default_value);
+            return cv::NodeConverter<T>::read(node, val, default_value);
         }
 #endif
 
@@ -762,16 +693,28 @@ namespace SLAM
         template<typename T>
         inline void YamlWriter::SaveNode(YAML::Emitter &yaml, const std::string &name, const T &value)
         {
-            yaml << YAML::BeginMap;
             yaml << YAML::Key << name;
             yaml << YAML::Value << value;
-            yaml << YAML::EndMap;
         }
 #else
         template<typename T>
         inline void YamlWriter::SaveNode(cv::FileStorage &yaml, const std::string &name, const T &value)
         {
-            cv::write(yaml, name, value);
+            cv::NodeConverter<T>::write(yaml, name, value);
+        }
+#endif
+
+#ifdef SLAM_HAVE_YAML
+        template<typename T>
+        inline void YamlIO::Write(const std::string &name, const T &value)
+        {
+            m_root[name] = value;
+        }
+#else
+        template<typename T>
+        inline void YamlIO::Write(const std::string &name, const T &value)
+        {
+            m_root[name] = value;
         }
 #endif
     }

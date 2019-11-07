@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <cstring>
 #include "Basic/Yaml.h"
 
 // file type(i,n,s,f) name

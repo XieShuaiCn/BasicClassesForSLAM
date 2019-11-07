@@ -141,7 +141,7 @@ namespace SLAM
             if(it0 < name.size() && node.IsDefined() && node.IsMap())
                 return node[name.substr(it0)];
             else
-                return YAML::Node();
+                return node;
         }
 #else
         const cv::FileNode YamlReader::GetNode(const cv::FileNode &node, const std::string &name)
@@ -173,27 +173,37 @@ namespace SLAM
             if(it0 < name.size() && !node.empty())
                 return node[name.substr(it0)];
             else
-                return cv::FileNode();
+                return node;
         }
 #endif // SLAM_HAVE_YAML
 
 #ifdef SLAM_HAVE_YAML
+        YamlWriter::YamlWriter()
+        {
+            m_out << YAML::BeginMap;
+        }
+
         YamlWriter::YamlWriter(const std::string &file)
         {
             m_strFile = file;
+            m_out << YAML::BeginMap;
         }
 
         YamlWriter::YamlWriter(std::ostream &ostream) :
                 m_out(ostream)
         {
+            m_out << YAML::BeginMap;
         }
 
         YamlWriter::~YamlWriter()
         {
-            std::ofstream of(m_strFile);
-            if(of) {
-                of << m_out.c_str();
-                of.close();
+            m_out << YAML::EndMap;
+            if(!m_strFile.empty()) {
+                std::ofstream of(m_strFile);
+                if (of) {
+                    of << m_out.c_str();
+                    of.close();
+                }
             }
         }
 
@@ -202,6 +212,9 @@ namespace SLAM
             return std::string(m_out.c_str());
         }
 #else
+        YamlWriter::YamlWriter()
+        {     }
+
         YamlWriter::YamlWriter(const std::string &file)
         {
             m_out.open(file, cv::FileStorage::WRITE);
@@ -224,21 +237,32 @@ namespace SLAM
         }
 #endif
 
-        YamlIO::YamlIO(const std::string &file) :
-                YamlReader(file), YamlWriter(file)
+        YamlIO::YamlIO(const std::string &file) : m_strFile(file)
         {
-
+            YamlReader::LoadFile(file);
         }
 
-        YamlIO::YamlIO(std::iostream &stream) :
-                YamlReader(), YamlWriter(stream)
+        YamlIO::~YamlIO()
         {
-            if (stream)
-            {
-                std::stringstream buffer;
-                buffer << stream.rdbuf();
-                YamlReader::LoadString(buffer.str());
+            if(!m_strFile.empty()){
+#ifdef SLAM_HAVE_YAML
+                std::ofstream fout(m_strFile, std::ios::out);
+                fout << m_root;
+                fout.close();
+#else
+#endif
             }
+        }
+
+        std::string YamlIO::GetString()
+        {
+#ifdef SLAM_HAVE_YAML
+            std::stringstream ss;
+            ss << m_root;
+            return ss.str();
+#else
+            return std::string();
+#endif
         }
     }
 }
@@ -246,122 +270,7 @@ namespace SLAM
 #ifdef SLAM_HAVE_YAML
 namespace YAML
 {
-#ifdef SLAM_HAVE_OPENCV
-    // convert 'YAML::Node' to 'template Mat'
-    template<typename _Ty>
-    cv::Mat ConvertToMatT(const Node &node, int rows, int cols)
-    {
-        cv::Mat __mat(rows, cols, SLAM::Basic::TypeFromStd<_Ty>::CvCode);
-        for (int i = 0; i < rows; ++i)
-        {
-            _Ty *p = (_Ty *) (__mat.ptr(i));
-            for (int j = 0; j < cols; ++j)
-            {
-                *p = node[i * cols + j].as<_Ty>();
-                ++p;
-            }
-        }
-        return __mat;
-    }
 
-    // convert 'template Mat' to 'YAML::Node'
-    template<typename _Ty>
-    void ConvertFromMatT(Node &node, const cv::Mat &mat)
-    {
-        node["rows"] = Node(mat.rows);
-        node["cols"] = Node(mat.cols);
-        node["dt"] = Node(char(SLAM::Basic::TypeFromStd<_Ty>::Name));
-        Node node_data;
-        for (int i = 0; i < mat.rows; ++i)
-        {
-            _Ty *p = (_Ty *) (mat.ptr(i));
-            for (int j = 0; j < mat.cols; ++j)
-            {
-                node_data.push_back<_Ty>(*(p + j));
-            }
-        }
-        node["data"] = node_data;
-    }
-
-    // Specific template of cv::Mat converter
-    Node convert<cv::Mat>::encode(const cv::Mat &m)
-    {
-        Node node;
-        switch (m.depth())
-        {
-            case CV_64F:
-                ConvertFromMatT<double>(node, m);
-                break;
-            case CV_32F:
-                ConvertFromMatT<float>(node, m);
-                break;
-            case CV_32S:
-                ConvertFromMatT<int>(node, m);
-                break;
-            case CV_16S:
-                ConvertFromMatT<short>(node, m);
-                break;
-            case CV_16U:
-                ConvertFromMatT<unsigned short>(node, m);
-                break;
-            case CV_8S:
-                ConvertFromMatT<char>(node, m);
-                break;
-            case CV_8U:
-                ConvertFromMatT<unsigned char>(node, m);
-                break;
-            default:
-                ConvertFromMatT<unsigned char>(node, m);
-                break;
-        }
-        return node;
-    }
-
-    bool convert<cv::Mat>::decode(const Node &node, cv::Mat &mat)
-    {
-        if (!node.IsMap() || node.size() != 4)
-        {
-            return false;
-        }
-        // size
-        int rows = node["rows"].as<int>();
-        int cols = node["cols"].as<int>();
-        if (rows == 0 || cols == 0)
-            return false;
-        // type
-        char dt = node["dt"].as<char>();
-        auto node_data = node["data"];
-        switch (dt)
-        {
-            case 'd':
-                mat = ConvertToMatT<double>(node_data, rows, cols);
-                break;
-            case 'f':
-                mat = ConvertToMatT<float>(node_data, rows, cols);
-                break;
-            case 'i':
-                mat = ConvertToMatT<int>(node_data, rows, cols);
-                break;
-            case 's':
-                mat = ConvertToMatT<short>(node_data, rows, cols);
-                break;
-            case 'w':
-                mat = ConvertToMatT<unsigned short>(node_data, rows, cols);
-                break;
-            case 'c':
-                mat = ConvertToMatT<char>(node_data, rows, cols);
-                break;
-            case 'u':
-                mat = ConvertToMatT<unsigned char>(node_data, rows, cols);
-                break;
-            default:
-                return false;
-        }
-        return true;
-    }
-
-    template struct convert<Eigen::Matrix<double, 3, 1>>;
-#endif
 }
 #else
 namespace cv

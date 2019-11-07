@@ -1,13 +1,8 @@
 #ifndef SLAM_CONFIG_H
 #define SLAM_CONFIG_H
 
-#cmakedefine BUILD_SHARED_LIBS
-
 /* Use GPU to accelerate computing. */
 #cmakedefine SLAM_ENABLE_CUDA
-
-/* Use feature points in tracking and mapping. */
-#cmakedefine SLAM_ENABLE_POINT
 
 /* Complete all work in one thread */
 #cmakedefine SLAM_SINGLE_THREAD
